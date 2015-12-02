@@ -1,0 +1,446 @@
+
+#include "conf.h"
+
+#include <windows.h>
+#include <stdio.h>
+#include <iostream>
+#include <list>
+#include <algorithm>
+#include <time.h>
+#include <math.h>
+
+using namespace std;
+
+#include "util.h"
+#include "glut.h"
+#include "gl.h"
+
+#define SCENE_FILE_NAME "../resources/mscene.bmp"
+
+
+///////////////////////////////////////// utworzenie obiektu klasy CGL
+CGL cgl;
+
+
+///////////////////////////////////////// inicjalizacja srodowiska graficznego oraz zmiennych 
+void CGL::init( void ) {
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+	gluPerspective( 20, 1, 0.01, 100 );
+	gluLookAt( 0, 0, 4, 0, 0, 0, 0, 1, 0 );
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+	
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+
+	// ustawienie parametrow zrodla swiatla, wlaczenie oswietlenia
+	float vec[4];
+	SET_VEC4( vec, 0.7f, 0.7f, 0.4f, 1.0f );
+	glLightfv(GL_LIGHT0, GL_POSITION, vec );
+	SET_VEC4( vec, 0.7f, 0.7f, 0.7f, 1.0f );
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, vec);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, vec);
+	glLightfv(GL_LIGHT0, GL_EMISSION, vec);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, vec);    
+	glEnable(GL_LIGHT0);    
+	glEnable(GL_LIGHTING);
+
+	// wlaczenie cieniowania Gouraud'a (smooth shading)
+	glShadeModel( GL_SMOOTH ); 
+
+	// ustawienie koloru tla
+	glClearColor( 0.2f, 0.2f, 0.2f, 1.0f ); 
+
+	// skasowanie bufora klawiatury
+	for( int i=0; i < 256; i++ )
+			cgl.keyStates[i] = false;
+
+	// poczatkowe polozenie obiektu
+	posX = 0.5;
+	posY = 0.5;
+	rotation = 90;	
+	posXOld = posX;
+	posYOld = posY;
+	rotationOld = rotation;
+	
+	// odczytanie i wyswietlenie wersji OpenGL
+	char* version = (char*)glGetString(GL_VERSION);
+	printf("GL version: %s\n", version);	
+
+	// odczytanie struktury sceny z zewnetrznego pliku (!!! dane bitmapy odczytane sa w formacie BGR888)
+	BITMAPINFOHEADER bitmapInfoHeader;
+	mscene = CUTIL::LoadBitmapFile( SCENE_FILE_NAME, &bitmapInfoHeader );
+	if( mscene == NULL ) {
+		printf( "ERROR: cannot open input file with the scene data\n" );
+		exit(1);
+	}
+	mscene_width = (int)bitmapInfoHeader.biWidth;
+	mscene_height = (int)bitmapInfoHeader.biHeight;
+	mscene_line_length = (int)(bitmapInfoHeader.biSizeImage / mscene_height );
+	printf( "bitmap size: %d,%d (line length:%d, size:%d (%d))\n", mscene_width, mscene_height, mscene_line_length, bitmapInfoHeader.biSizeImage, (mscene_width*mscene_height*3) );
+	/*
+	for( int c = 0; c < mscene_height; c++ ) {
+		for( int w = 0; w < mscene_width; w++ ) {
+
+			int idx = xy2idx( w, c );
+
+			printf("(%d,%d,%d)",mscene[idx],mscene[idx+1],mscene[idx+2] );
+		}
+		printf("\n");
+	}*/
+
+	// poczatkowe stany gry (! wazna jest kolejnosc stanow na liscie)
+	state_list.push_back( STATE_DRAW_SCENE );
+	state_list.push_back( STATE_DRAW_OBJECT );
+	state_list.push_back( STATE_NEW_LIGHT );
+	state_list.push_back( STATE_COLLISIONS_SCENE );
+	state_list.push_back( STATE_COLLISIONS );
+	state_list.push_front( STATE_MISSLE );
+}
+
+
+///////////////////////////////////////// glowna procedura przerysowania ekranu
+
+bool is_first = true;
+
+void CGL::display( void ) {
+
+	if( is_first ) {
+		t_old = CUTIL::getTime();
+		is_first = false;
+	}
+	
+	float t = CUTIL::getTime(); // aktualny czas
+	float dt = t - t_old; // czas, ktory uplynal od poprzedniego wywolania display()
+	t_old = t;
+	 
+	
+	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+	// obsluga klawiatury	
+	keyOperations(); 
+	
+	// transformacja calej sceny
+	glPushMatrix();	
+
+	// przesuniecie planszy na srodek okna
+	glTranslatef( -0.5f, -0.5f, 0.0f );
+
+	// zmiana widoku kamery
+	//glTranslatef( 0.0f, 0.0f, 0.1f ); // przesuniecie korekcyjne	
+	//glRotatef( -30, 1, 0, 0 ); // pochylenie kamery (3PP)
+	//glRotatef( -rotation+90, 0, 0, 1 ); // obrot planszy zgodnie z obrotem gracza
+	//glTranslatef( -posX, -posY, 0.0f );	// przesuniecie planszy do polozenia gracza
+
+
+	// glowna petla obslugujaca stany gry
+	int idx;
+	bool bb;
+	list<CMissle*>::iterator it;
+	list<int> states = state_list;
+	list<int>::iterator state;
+	for( state = states.begin(); state != states.end(); ++state) {
+		switch( *state ) {
+	
+			//////////////////////// dodatkowe zrodlo swiatla
+			case STATE_NEW_LIGHT:
+				// polozenie zrodla swiatla (LIGHT1)
+				//glMaterialfv( GL_FRONT, GL_DIFFUSE, colorGray );
+				//glMaterialfv( GL_FRONT, GL_AMBIENT, colorGray );
+				glMaterialfv( GL_FRONT, GL_EMISSION, colorWhite );
+				glPushMatrix();
+				glTranslatef( 0.7f, 0.7f, 0.3f );
+				glScalef(0.01f,0.01f,0.01f);
+				glutSolidSphere( 1, 20, 20 );
+				glPopMatrix();
+				float vec[4];
+				SET_VEC4( vec, 0.7f, 0.7f, 0.3f, 1.0f );
+				glLightfv(GL_LIGHT0, GL_POSITION, vec );
+				glMaterialfv( GL_FRONT, GL_EMISSION, colorDim );
+				break;
+
+			///////////////////	obrot obiektu w lewo
+			case STATE_ROTATE_OBJECT_LEFT:
+				rotationOld = rotation;
+				rotation = rotation + dt * 0.2f;
+				state_list.remove( STATE_ROTATE_OBJECT_LEFT );
+				break;
+
+			///////////////////	obrot obiektu w prawo
+			case STATE_ROTATE_OBJECT_RIGHT:
+				rotationOld = rotation;
+				rotation = rotation - dt * 0.2f;
+				state_list.remove( STATE_ROTATE_OBJECT_RIGHT );
+				break;
+
+			///////////////////	ruch obiektu do przodu
+			case STATE_MOVE_OBJECT_FORWARD:
+
+				posXOld = posX;
+				posYOld = posY;
+				posX = posX + dt * 0.0005f * cos( rotation * 3.14f / 180.0f );
+				posY = posY + dt * 0.0005f * sin( rotation * 3.14f / 180.0f );
+
+				// wykrywanie kolizji z elementami sceny zdefiniowanymi w tablicy
+				if( findState( STATE_COLLISIONS_SCENE ) ) {
+					bb = xy2mscene( posX, posY, idx );
+					if( bb || (mscene[idx] == SCENE_COLLISION && mscene[idx+1] == SCENE_COLLISION && mscene[idx+2] == SCENE_COLLISION) ) {
+						posX = posXOld;
+						posY = posYOld;
+					}
+				}
+
+				state_list.remove( STATE_MOVE_OBJECT_FORWARD );
+				break;
+
+			/////////////////// kolizje
+			case STATE_COLLISIONS:
+				if( detectCollision( collisionTarget ) ) 
+					pmaterial = MATERIAL_PLAYER_BLUE;
+				else
+					pmaterial = MATERIAL_PLAYER_RED;
+				break;
+
+			///////////////////	rysowanie obiektu
+			case STATE_DRAW_OBJECT:
+				drawObject();
+				break;					
+
+			///////////////////	rysowanie obiektu
+			case STATE_DRAW_SCENE:
+				drawScene();
+				break;	
+
+			////////////////// ruch, kolizje i kasowanie pociskow
+			case STATE_MISSLE:
+				for( it = missle_list.begin(); it != missle_list.end(); it++) {
+
+					(*it)->x = (*it)->x + dt * 0.0005f * cos( (*it)->dir * 3.14f / 180.0f );
+					(*it)->y = (*it)->y + dt * 0.0005f * sin( (*it)->dir * 3.14f / 180.0f );
+
+					// kolizje pocisku ze scianami planszy
+					bb = xy2mscene( (*it)->x, (*it)->y, idx );
+					if( bb || (mscene[idx] == SCENE_COLLISION && mscene[idx+1] == SCENE_COLLISION && mscene[idx+2] == SCENE_COLLISION) ) {
+						mscene[idx] = 0;
+						mscene[idx+1] = 0;
+						mscene[idx+2] = 0;
+						delete (*it);
+						missle_list.erase( it );
+						break;
+					}
+
+					// skasowanie pocisku po przekroczeniu granic planszy 
+					if( (*it)->x < 0 || (*it)->x > 1 || (*it)->y < 0 || (*it)->y > 1 ) {
+						delete (*it);
+						missle_list.erase( it );
+						break;
+					}
+					else
+						drawMissle( *it );
+				}
+				break;
+
+			////////////////// ruch pociskow
+			case STATE_WAIT:
+				t_wait = t_wait + dt;
+				break;
+
+
+		}
+		
+	}
+
+	glPopMatrix();
+
+
+
+	// wyswietlenie tylniego ekranu
+	glutSwapBuffers(); 
+	
+	// wymuszenie przerysowania podczas nastêpnej synchronizacji ekranu
+	glutPostRedisplay(); 
+
+
+}
+
+
+///////////////////////////////////////// rysowanie obiektu
+void CGL::drawMissle( CMissle* cm ) {
+
+	
+
+	setMaterial( MATERIAL_WALL_RED );
+
+	glPushMatrix();
+	glTranslatef( cm->x, cm->y, 0.0f );
+	glScalef( 0.01f, 0.01f, 0.01f );	
+
+	//if( findState( STATE_COLLISIONS ) ) {
+		//glGetFloatv( GL_MODELVIEW_MATRIX, collisionTarget.m );
+		//collisionTarget.r = 0.025f;
+	//}
+
+	glutSolidSphere( 1, 20, 20 );
+	glPopMatrix();
+
+}
+
+
+///////////////////////////////////////// rysowanie obiektu
+void CGL::drawObject( void ) {
+
+	setMaterial( pmaterial );
+
+	glPushMatrix();
+	glTranslatef( posX, posY, 0.0f );
+	glRotatef( rotation, 0.0f, 0.0f, 1.0f );
+	glRotatef( 90.0f, 1.0f, 0.0f, 0.0f );
+	glScalef( 0.05f, 0.05f, 0.05f );	
+
+	if( findState( STATE_COLLISIONS ) ) {
+		glGetFloatv( GL_MODELVIEW_MATRIX, collisionTarget.m );
+		collisionTarget.r = 0.025f;
+	}
+
+	glutSolidTeapot( 1 );
+	glPopMatrix();
+	
+}
+
+///////////////////////////////////////// rysowanie obiektow na scenie w oparciu o dane bitmapy
+void CGL::drawScene( void ) {
+
+	if( findState( STATE_COLLISIONS ) )
+		collision_list.clear(); // skasowanie listy kolizji
+
+	glPushMatrix();
+
+	for( int c = 0; c < mscene_height; c++ ) {
+		for( int w = 0; w < mscene_width; w++ ) {
+
+			int idx = xy2idx( w, c );
+
+			if( mscene[idx] == 255 && mscene[idx+1] == 255 && mscene[idx+2] == 255 ) { // biale elementy
+
+				// kolor obiektu
+				setMaterial( MATERIAL_WALL_GRAY );
+			
+				glPushMatrix();
+				glTranslatef( (float)w/(float)mscene_width + 0.5f/(float)mscene_width , (float)c/(float)mscene_height + 0.5f/(float)mscene_height, 0.0f );
+				glScalef( 0.5f/(float)mscene_width-0.005f, 0.5f/(float)mscene_height-0.005f, 0.5f/(float)mscene_width-0.001f );			
+				CUTIL::drawBox();
+
+				glPopMatrix();
+			}
+
+			if( mscene[idx] == 0 && mscene[idx+1] == 255 && mscene[idx+2] == 0 ) { // zielone elementy
+
+				// kolor obiektu
+				setMaterial( MATERIAL_WALL_GREEN );
+
+				glPushMatrix();
+				glTranslatef( (float)w/(float)mscene_width + 0.5f/(float)mscene_width , (float)c/(float)mscene_height + 0.5f/(float)mscene_height, 0.0f );
+				glScalef( 0.5f/(float)mscene_width-0.005f, 0.5f/(float)mscene_height-0.005f, 0.5f/(float)mscene_width-0.001f );			
+				CUTIL::drawBox();
+				glPopMatrix();
+			}
+
+
+			if( mscene[idx] == 0 && mscene[idx+1] == 0 && mscene[idx+2] == 255 ) { // czerwone elementy
+
+				// kolor obiektu
+				setMaterial( MATERIAL_WALL_RED );
+
+				glPushMatrix();
+				glTranslatef( (float)w/(float)mscene_width + 0.5f/(float)mscene_width , (float)c/(float)mscene_height + 0.5f/(float)mscene_height, 0.0f );
+				glScalef( 0.5f/(float)mscene_width-0.005f, 0.5f/(float)mscene_height-0.005f, 0.5f/(float)mscene_width-0.001f );			
+				CUTIL::drawBox();
+
+				if( findState(STATE_COLLISIONS) ) {
+					addCollision( 0.05f );
+				}
+				glPopMatrix();
+			}
+
+		}
+	}
+
+	glPopMatrix();
+
+}
+
+
+///////////////////////////////////////// obsluga klawiatury
+
+void CGL::keyUp( unsigned char key,int a,int b ) {
+	
+	keyStates[key] = false;	
+}
+
+void CGL::keyPress( unsigned char key,int a,int b ) {
+
+	keyStates[key] = true;
+}
+	
+void CGL::keyOperations( void ) {	
+	
+	if ( keyStates[27] ) {
+		exit(0);
+	}
+
+	// obrot obiektu w lewo
+	if ( keyStates['a'] ) {
+		if (!findState(STATE_ROTATE_OBJECT_LEFT)) {
+			state_list.remove( STATE_ROTATE_OBJECT_RIGHT );
+			state_list.push_front( STATE_ROTATE_OBJECT_LEFT );	
+		}
+	}
+
+	// obrot obiektu w prawo
+	if ( keyStates['d'] ) {
+		if (!findState(STATE_ROTATE_OBJECT_RIGHT)) {
+			state_list.remove( STATE_ROTATE_OBJECT_LEFT );
+			state_list.push_front( STATE_ROTATE_OBJECT_RIGHT );	
+		}
+	}
+
+	// ruch obiektu do przodu
+	if ( keyStates['w'] ) {
+		if (!findState(STATE_MOVE_OBJECT_FORWARD)) {
+			state_list.push_front( STATE_MOVE_OBJECT_FORWARD );	
+		}
+	}
+
+	// strzelanie
+	if ( keyStates[' '] ) {
+
+		if (findState(STATE_WAIT)) { 
+			if( t_wait > t_wait_time )
+				state_list.remove( STATE_WAIT );
+		}
+		else {
+			CMissle* cm = new CMissle();
+			cm->x = posX;
+			cm->y = posY;
+			cm->dir = rotation;
+			missle_list.push_back( cm );
+
+			// kolejny pocisk bedzie mozna utworzyc po 100 [msec]
+			t_wait = 0;
+			t_wait_time = 100;
+			state_list.push_front( STATE_WAIT );
+		}
+
+	}
+
+}
+
+
+
+
+
+
+

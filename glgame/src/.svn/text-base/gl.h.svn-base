@@ -1,0 +1,242 @@
+#ifndef __GL_H
+#define __GL_H
+
+#include <iostream>
+#include <list>
+#include <math.h>
+
+using namespace std;
+
+
+// Klasa obslugujaca kolizje gracza z obiektami.
+class CCollision {
+public:
+	float x, y; // polozenie srodka na plaszczyznie XY
+	float m[16]; // polozenie srodka obiektu
+	float r; // srednica sfery kolizyjnej
+};
+
+// Klasa obslugujaca strzelanie
+class CMissle {
+public:
+	float x, y; // polozenie pocisku
+	float dir; // kierunek ruchu
+};
+
+
+/** Glowna klasa odpowiedzialna za sterowanie aplikacja i rysowanie grafiki. Klasa jest 'wrapperem' dla funkcji wywolywanych 
+bezposrednio przez API OpenGL'a. Jej zastosowanie ma na celu wykorzystanie mechanizmow obiektowych do programowania OpenGL'a
+(natywnie API OpenGL'a wymaga programowania w ANSI C)). W klasie znajduje sie szereg funkcji wywolywanych przez maszyne 
+stanu OpenGL'a. Przykladem moze byc funkcja display() wywolywana w momencie, gdy wymagane jest przerysowanie ekranu.
+*/
+
+class CGL {
+
+public: 
+
+	list<int> state_list; // lista stanow
+
+	bool keyStates[256]; // bufor klawiatury
+
+	float t, dt, t_old; // czas
+	float t_wait, t_wait_time;
+
+	float rotation; // obrot obiektu
+	float posX, posY; // translacja obiektu
+	float rotationOld; // poprzednia wartosc obrotu obiektu
+	float posXOld, posYOld; // poprzednie polozenie obiektu
+
+	unsigned char* mscene; // wskaznik na dane bitmapy z informacjami o strukturze sceny
+	short mscene_width;
+	short mscene_height;
+	int mscene_line_length;
+
+	list<CCollision> collision_list; // lista z obietkami, dla ktorych liczone sa kolizje
+	CCollision collisionTarget; 
+	bool isCollision;
+
+	int pmaterial; // indeks materialu czajnika (zmieniany po kolizji)
+
+	list<CMissle*> missle_list; // lista z definicjami pociskow
+
+public:
+
+	CGL() {
+		
+		state_list.clear(); // kasowanie listy stanow
+
+		for(int i=0;i<256;i++) // kasowanie bufora klawiatury
+			keyStates[i] = 0;
+
+		//isCollision = false;
+		pmaterial = MATERIAL_PLAYER_RED;
+		missle_list.clear();
+	}
+
+	void init( void ); // Inicjalizacja srodowiska graficznego
+	void display( void ); // przerysowanie sceny
+	void drawObject( void ); // dodawanie obiektu do sceny
+	void keyPress( unsigned char key,int a,int b ); // nacisniecie klawiatury
+	void keyUp( unsigned char key,int a,int b ); // puszczenie klawisza klawiatury
+	void keyOperations( void ); // obsluga klawiatury
+	void drawScene( void ); // rysowanie sceny
+	void drawMissle( CMissle* cm ); // rysowanie pociskow
+
+
+	/** Pomocnicza funkcja sprawdzajaca czy na liscie stanow wystepuje dany stan
+	 */
+	bool findState( int state ) {
+		
+		list<int> states = state_list;
+		list<int>::iterator state_it;
+		
+		for( state_it = states.begin(); state_it != states.end(); ++state_it) {
+			
+			if ( *state_it == state ) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	// Funkcja z definicjami materialow
+	void setMaterial( int id ) {
+
+		switch( id ) {
+
+			case MATERIAL_PLAYER_RED:
+				glMaterialfv( GL_FRONT, GL_DIFFUSE, colorRed );
+				glMaterialfv( GL_FRONT, GL_AMBIENT, colorDim );
+				//glMaterialfv( GL_FRONT, GL_SPECULAR, colorGray );
+				//glMaterialf( GL_FRONT, GL_SHININESS, 20.0f );
+				//glMaterialfv( GL_FRONT, GL_EMISSION, colorDarkRed );
+				break;
+
+			case MATERIAL_PLAYER_BLUE:
+				glMaterialfv( GL_FRONT, GL_DIFFUSE, colorBlue );
+				glMaterialfv( GL_FRONT, GL_AMBIENT, colorDim );
+				//glMaterialfv( GL_FRONT, GL_SPECULAR, colorGray );
+				//glMaterialf( GL_FRONT, GL_SHININESS, 0.0f );
+				//glMaterialfv( GL_FRONT, GL_EMISSION, colorDim );
+				break;
+
+			case MATERIAL_WALL_GRAY:
+				glMaterialfv( GL_FRONT, GL_DIFFUSE, colorDarkGray );
+				glMaterialfv( GL_FRONT, GL_AMBIENT, colorDim );
+				glMaterialfv( GL_FRONT, GL_SPECULAR, colorDim );
+				glMaterialfv( GL_FRONT, GL_EMISSION, colorDim );
+				break;
+
+			case MATERIAL_WALL_RED:
+				glMaterialfv( GL_FRONT, GL_DIFFUSE, colorDarkRed );
+				glMaterialfv( GL_FRONT, GL_AMBIENT, colorDim );
+				glMaterialfv( GL_FRONT, GL_SPECULAR, colorDim );
+				glMaterialfv( GL_FRONT, GL_EMISSION, colorDim );
+				break;
+
+			case MATERIAL_WALL_GREEN:
+				glMaterialfv( GL_FRONT, GL_DIFFUSE, colorDarkGreen );
+				glMaterialfv( GL_FRONT, GL_AMBIENT, colorDim );
+				glMaterialfv( GL_FRONT, GL_SPECULAR, colorDim );
+				glMaterialfv( GL_FRONT, GL_EMISSION, colorDim );
+				break;
+
+		}
+
+	}
+
+
+	// Konwersja polozenia w bitmapie na indeks liniowy
+	int xy2idx( int x, int y ) {
+		return x * 3 + y * mscene_line_length;
+	}
+
+	// konwersja wspolrzednych sceny na wspolrzedne tablicy, 
+	// funkcja zwraca true w przypadku wyjscia indeksu poza tablice
+	bool xy2mscene( float x, float y, int &ix, int &iy ) {
+
+		bool f = false;
+
+		ix = (int)( mscene_width * x );
+		iy = (int)( mscene_height * y );
+
+		if( x < 0 )
+			f = true;
+		if( y < 0 )
+			f = true;
+
+		if( ix < 0 ) {
+			ix = 0;
+			f = true;
+		}
+		if( iy < 0 ) {
+			iy = 0;
+			f = true;
+		}
+		if( ix >= mscene_width ) {
+			ix = mscene_width - 1;
+			f = true;
+		}
+		if( iy >= mscene_height ) {
+			iy = mscene_height - 1;
+			f = true;
+		}
+
+		return f;
+	}
+
+	bool xy2mscene( float x, float y, int &idx ) {
+
+		int ix, iy;
+		bool f = xy2mscene( x, y, ix, iy );
+		if( f == false )
+			idx = xy2idx( ix, iy );
+		else
+			idx = 0;
+
+		return f;
+	}
+
+
+
+	// dodanie obiektu do listy obiektow, dla ktorych sprawdzane sa kolizje
+	bool addCollision( float r ) {
+
+		CCollision col;
+		glGetFloatv( GL_MODELVIEW_MATRIX, col.m );
+
+		col.r = r;
+		collision_list.push_back( col );
+
+		//glutWireSphere( 1.5, 10, 10 );
+		
+		return true;
+	}
+
+	// detekcja kolizji dla danego obiektu
+	bool detectCollision( CCollision colTarget ) {
+
+		list<CCollision> collisions = collision_list;
+		list<CCollision>::iterator iter;
+		for( iter = collision_list.begin(); iter != collision_list.end(); ++iter) {
+
+			CCollision col = *iter; 
+
+			float len = sqrt( (colTarget.m[12+0]-col.m[12+0])*(colTarget.m[12+0]-col.m[12+0]) + (colTarget.m[12+1]-col.m[12+1])*(colTarget.m[12+1]-col.m[12+1])
+				+ (colTarget.m[12+2]-col.m[12+2])*(colTarget.m[12+2]-col.m[12+2]) );
+
+			if( len < ( colTarget.r + col.r ) )
+				return true;
+		}
+
+		return false;
+	}
+	
+	
+};
+
+extern CGL cgl;
+
+#endif
+
+

@@ -1,0 +1,39 @@
+
+#include "conf.h"
+#include "glut.h"
+#include "gl.h"
+
+// obsluga klawiatury
+
+void keyUp( unsigned char key,int a,int b ) {
+	cgl.keyUp( key, a, b );	
+}
+
+void keyPress( unsigned char key, int a, int b ) {
+	cgl.keyPress( key, a, b );
+}
+
+// przerysowanie ekranu
+void display(void) {
+	cgl.display();
+}
+
+
+//
+int main(int argc, char *argv[])
+{
+    glutInit(&argc, argv);
+    glutInitWindowSize( 880, 800 );
+    glutInitWindowPosition(10,10);
+    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
+
+    glutCreateWindow("GL Game");
+    glutDisplayFunc(display);
+	glutKeyboardFunc(keyPress);
+	glutKeyboardUpFunc(keyUp);
+	 
+	cgl.init();
+    glutMainLoop();
+}
+
+

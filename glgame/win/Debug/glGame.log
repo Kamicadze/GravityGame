@@ -1,0 +1,27 @@
+﻿Build started 2015-01-29 19:28:55.
+     1>Project "C:\Users\Kuba\Desktop\Grafika\grafa0.5\glgame\win\glGame.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         G:\kompilatory\Visual2013\VC\bin\CL.exe /c /I../3rd/freeglut/include/GL /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt ..\src\gl.cpp
+         gl.cpp
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(136): warning C4018: '<' : signed/unsigned mismatch
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(214): warning C4305: '=' : truncation from 'double' to 'float'
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(215): warning C4305: '=' : truncation from 'double' to 'float'
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(360): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(394): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(419): warning C4305: '=' : truncation from 'double' to 'float'
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(420): warning C4305: '=' : truncation from 'double' to 'float'
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(502): warning C4244: '=' : conversion from 'float' to 'int', possible loss of data
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(622): warning C4244: 'argument' : conversion from 'int' to 'GLfloat', possible loss of data
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(623): warning C4244: 'argument' : conversion from 'int' to 'GLfloat', possible loss of data
+     1>c:\users\kuba\desktop\grafika\grafa0.5\glgame\src\gl.cpp(1048): warning C4244: '=' : conversion from 'float' to 'int', possible loss of data
+       Link:
+         G:\kompilatory\Visual2013\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"../bin/glGame.exe" /INCREMENTAL /NOLOGO /LIBPATH:../3rd/freeglut/lib/x86 opengl32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"../bin/glGame.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"../bin/glGame.lib" /MACHINE:X86 Debug\glGame.res
+         Debug\BMP.obj
+         Debug\gl.obj
+         Debug\glgame.obj
+         glGame.vcxproj -> C:\Users\Kuba\Desktop\Grafika\grafa0.5\glgame\win\../bin/glGame.exe
+     1>Done Building Project "C:\Users\Kuba\Desktop\Grafika\grafa0.5\glgame\win\glGame.vcxproj" (Build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:02.09

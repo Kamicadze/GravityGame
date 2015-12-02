@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 33
+/svn/rmnp/!svn/ver/241/glgame/src
+END
+gl.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/svn/rmnp/!svn/ver/245/glgame/src/gl.cpp
+END
+util.h
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/svn/rmnp/!svn/ver/243/glgame/src/util.h
+END
+gl.h
+K 25
+svn:wc:ra_dav:version-url
+V 38
+/svn/rmnp/!svn/ver/245/glgame/src/gl.h
+END
+conf.h
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/svn/rmnp/!svn/ver/245/glgame/src/conf.h
+END
+glgame.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/rmnp/!svn/ver/243/glgame/src/glgame.cpp
+END
